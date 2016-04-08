@@ -1,11 +1,9 @@
 <component name="libraryTable">
   <library name="jscience">
-    <CLASSES>
-      <root url="jar://$USER_HOME$/Downloads/jscience-4.3/jscience.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES>
-      <root url="jar://$USER_HOME$/Downloads/jscience-4.3/jscience.jar!/" />
-    </SOURCES>
+    <CLASSES />
+    <JAVADOC>
+      <root url="jar://D:/Downloads/jscience-4.3.1-bin.zip!/jscience-4.3/api" />
+    </JAVADOC>
+    <SOURCES />
   </library>
 </component>

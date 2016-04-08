@@ -1,3 +1,5 @@
+import org.jscience.mathematics.vector.Float64Vector;
+
 import java.util.Random;
 
 /**
@@ -10,6 +12,7 @@ public class Galaxy {
     double centerX, centerY, centerZ;
     int numStars;
     SimMain sm;
+    int colorCode;
 
 
 
@@ -26,6 +29,11 @@ public class Galaxy {
     public Galaxy(int numStars, SimMain sm) {
         this.numStars = numStars;
         this.sm = sm;
+        this.width = 150000;
+        this.height = 10000;
+        this.centerX = 0;
+        this.centerY = 0;
+        this.centerZ = 0;
     }
 
 
@@ -33,13 +41,16 @@ public class Galaxy {
     public void setStarDistribution(){
 
         for(int i = 0; i < numStars; i++){
-            double distanceFromCenter = getStarDistributionRandomNumber(1,15000);
+            double distanceFromCenter = getStarDistributionRandomNumber(1,(int)width);
             double Rsqr = distanceFromCenter*distanceFromCenter;
-            double m = Math.random();
+
+            double m = Math.random()*2+1;
             double randSign = Math.random();
 
-            double Y = Math.sqrt(Rsqr/(1+(m*m)));
+            double Y = Math.sqrt(Rsqr/(m*m));
             double X = Math.sqrt(Rsqr - (Y*Y));
+//            X *= 5;
+//            Y *= 5;
 
             if(randSign < 0.25){
                 Y = -Y;
@@ -51,17 +62,12 @@ public class Galaxy {
             }
 
             //Mass in Solar Masses, Positions in pc
-            addStar(new Star(sm.starIDCount,1,X,Y,0,this));
+            Star t = new Star(sm.starIDCount,1,X,Y,0,this);
+            setStarVelocity(t);
+            t.setColorCode(colorCode);
+            addStar(t);
+            System.out.println("Star " + sm.starIDCount + ", PosX: " + X + ", PosY: " + Y);
 
-
-
-//              X^2 + Y^2 = R^2
-//             (mY)^2 + Y^2 = R^2
-//             (m^2)Y^2 + Y^2 = R^2
-//             (1+m^2)Y^2 = R^2
-//             Y^2 = R^2/(1+m^2)
-//            ** Y = √(R^2/(1+m^2))
-//            ** X = √(R^2 - Y^2)
 
         }
     }
@@ -82,28 +88,27 @@ public class Galaxy {
         //Generate a random number whose value ranges from 0.0 to the sum of the values of yourFunction for all the possible integer return values from startIndex to stopIndex.
         double randomMultiplier = 0;
         for (int i = startIndex; i <= stopIndex; i++) {
-            randomMultiplier += (int)starDensityFunction(i);//yourFunction(startIndex) + yourFunction(startIndex + 1) + .. yourFunction(stopIndex -1) + yourFunction(stopIndex)
+            randomMultiplier += (int)starDen(i);//yourFunction(startIndex) + yourFunction(startIndex + 1) + .. yourFunction(stopIndex -1) + yourFunction(stopIndex)
         }
         Random r = new Random();
         double randomDouble = r.nextDouble() * randomMultiplier;
 
         //For each possible integer return value, subtract yourFunction value for that possible return value till you get below 0.  Once you get below 0, return the current value.
         int yourFunctionRandomNumber = startIndex;
-        randomDouble = randomDouble - starDensityFunction(yourFunctionRandomNumber);
+        randomDouble = randomDouble - starDen(yourFunctionRandomNumber);
         while (randomDouble >= 0) {
             yourFunctionRandomNumber++;
-            randomDouble = randomDouble - starDensityFunction(yourFunctionRandomNumber);
+            randomDouble = randomDouble - starDen(yourFunctionRandomNumber);
         }
 
         return yourFunctionRandomNumber;
     }
 
-    /**
-     *
-     * @param N (random number for distribution)
-     * @return R (radius from galactic center)
-     */
 
+
+    public static double starDen(int R){
+        return Math.exp(-R/3000);
+    }
 
     public static double starDensityFunction(int N){
         int hR = 3000;
@@ -114,7 +119,40 @@ public class Galaxy {
     //Set star initial velocities (220km/s outside inner 1kpc)
     //TODO: Find how to make the velocity perpendicular to the center
 
-    public void setStarVelocities(){
+    public void setStarVelocity(Star s){
 
+
+        double x1 = centerX - s.posX;
+        double y1 = centerY - s.posY;
+
+        Float64Vector a = Float64Vector.valueOf(x1,y1,0);
+        double r = a.normValue();
+        //Float64Vector a = Float64Vector.valueOf(x1,y1,0);
+
+
+        double velo = 220000;
+
+        if(r < 1.0){
+            velo *= (r+.1);
+        }
+
+        double theta = Math.atan(y1/x1);
+        if(x1 < 0){
+            r*=-1;
+        }
+        Float64Vector v = Float64Vector.valueOf(r*Math.cos(theta+1)-r*Math.cos(theta),r*Math.sin(theta+1)-r*Math.sin(theta),0);
+        double speedScale = (velo / v.normValue());
+        v = v.times(speedScale);
+        //System.out.println("speed : " +  v.normValue());
+
+        s.setVelocity(v);
+    }
+
+    public int getColorCode() {
+        return colorCode;
+    }
+
+    public void setColorCode(int colorCode) {
+        this.colorCode = colorCode;
     }
 }

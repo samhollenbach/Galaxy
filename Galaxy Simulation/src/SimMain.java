@@ -16,10 +16,10 @@ public class SimMain {
     static final double G = 6.67e-11;
     Star[] stars;
     int starIDCount = 0;
-    static int iterations = 1000;
-    static int particleNumber = 2;
-    static int timeStep = 10000000; //(seconds)
-
+    static int iterations = 2000;
+    static int particleNumber = 5000;
+    static double timeStep = 1e13; //(seconds)
+    static double timeStepYrs = timeStep /(60*60*24*364.75);
     int currentIteration = 0;
 
     Galaxy andromeda;
@@ -49,31 +49,38 @@ public class SimMain {
 
 
     //TODO: Add special cases for SMBH's
-    public void runSim(int particles, int iterations, int timeStep){
+    public void runSim(int particles, int iterations, double timeStep){
 
         stars = new Star[particles];
 
-        milkyWay = new Galaxy(particleNumber/2,this);
+        milkyWay = new Galaxy(particleNumber/2-1,this);
         andromeda = new Galaxy(particleNumber/2,this);
-        /*milkyWay.setStarDistribution();
-        andromeda.setStarDistribution();*/
-
-        stars[0] = new Star(0,1,
-                1e6,1e6,
+        milkyWay.setColorCode(1);
+        andromeda.setColorCode(2);
+        stars[0] = new Star(0,1e6,
+                0,0,
                 0,milkyWay);
-        stars[1] = new Star(1,1,
-                -1e6,-1e6,
-                0,andromeda);
-        /*stars[2] = new Star(2,1,
-                1e6,-1e6,
-                0,andromeda);*/
+        stars[0].setColorCode(0);
+        stars[0].setVelocity(Float64Vector.valueOf(0,0,0));
+        starIDCount++;
+        milkyWay.setStarDistribution();
+        andromeda.setStarDistribution();
 
-        Float64Vector tempV1 = Float64Vector.valueOf(-2e13,2e13,0);
-        Float64Vector tempV2 = Float64Vector.valueOf(2e13,-2e13,0);
-        //Float64Vector tempV3 = Float64Vector.valueOf(-4e13,3e12,0);
-        stars[0].setVelocity(tempV1);
-        stars[1].setVelocity(tempV2);
-        //stars[2].setVelocity(tempV3);
+
+
+//        stars[1] = new Star(1,1e6,
+//                -1e6,-1e6,
+//                0,andromeda);
+//        /*stars[2] = new Star(2,1,
+//                1e6,-1e6,
+//                0,andromeda);*/
+//
+//        Float64Vector tempV1 = Float64Vector.valueOf(-2e13,2e13,0);
+//        Float64Vector tempV2 = Float64Vector.valueOf(2e13,-2e13,0);
+//        //Float64Vector tempV3 = Float64Vector.valueOf(-4e13,3e12,0);
+//        stars[0].setVelocity(tempV1);
+//        stars[1].setVelocity(tempV2);
+//        //stars[2].setVelocity(tempV3);
 
         try {
             writer = new PrintWriter("sim_data.txt");
@@ -89,7 +96,7 @@ public class SimMain {
     }
 
     //Main loop for gravity interactions
-    public void simLoop(int iter, int timeStep){
+    public void simLoop(int iter, double timeStep){
 
         //write data about num-particles and center position of galaxies
         try {
@@ -108,6 +115,10 @@ public class SimMain {
             e.printStackTrace();
         }
 
+
+        System.out.println("**STARTING SIM LOOP**");
+        long simStartTime = System.currentTimeMillis();
+        long updateTime = simStartTime;
         //Main sim timestep loop
         for(int loopNumber = 0; loopNumber < iter; loopNumber++){
 
@@ -128,8 +139,20 @@ public class SimMain {
                 tempStar.netForce = netForce;
                 //System.out.println("NET FORCE " + s.ID + " is " + s.netForce);
             }
+            if(System.currentTimeMillis()-updateTime >= 60000){
+                System.out.println("Update: " + loopNumber + " iterations complete" );
+            }
             calculateMovesFromForce(timeStep);
+            if(loopNumber == iter/4){
+                System.out.println("Loop 25% Complete: " + loopNumber + "/" + iter + " lines processed in " + (System.currentTimeMillis()-simStartTime)/1000. + "s");
+            }else if(loopNumber == iter/2){
+                System.out.println("Loop 50% Complete: " + loopNumber + "/" + iter + " lines processed in " + (System.currentTimeMillis()-simStartTime)/1000. + "s");
+            }else if(loopNumber == iter*3/4){
+                System.out.println("Loop 75% Complete: " + loopNumber + "/" + iter + " lines processed in " + (System.currentTimeMillis()-simStartTime)/1000. + "s");
+            }
         }
+        System.out.println("**SIM LOOP COMPLETED IN " + (System.currentTimeMillis()-simStartTime)/1000. + "s**");
+
     }
 
 
@@ -149,17 +172,14 @@ public class SimMain {
 
 
         double Fg = (G * 1.988e30*s1.mass * 1.988e30*s2.mass) / (((p2X-p1X)*(p2X-p1X))
-            + ((p2Y-p1Y)*(p2Y-p1Y)) + ((p2Z-p1Z)*(p2Z-p1Z)));
+            + ((p2Y-p1Y)*(p2Y-p1Y)) + ((p2Z-p1Z)*(p2Z-p1Z))); //kg*m/s^2
 
 
-        Float64Vector vg = Float64Vector.valueOf((p2X-p1X),(p2Y-p1Y),(p2Z-p1Z));
+        Float64Vector vg = Float64Vector.valueOf((p2X-p1X),(p2Y-p1Y),(p2Z-p1Z)); //meters
         double scalar = -Fg/vg.normValue();
         //System.out.println("vg i : " + vg);
-        vg = vg.times(scalar);
-        //System.out.println("vg : " + vg);
 
-
-
+        vg = vg.times(scalar); //kg m/s^2
 
         return vg;
     }
@@ -169,24 +189,22 @@ public class SimMain {
     //TODO: Check if this is actually the right calculation for movement from the force
 
     //Also consider changing the way its set up to force changing the velocity, and then velocity changing position
-    public void calculateMovesFromForce(int timeStep){
+    public void calculateMovesFromForce(double timeStep){
         for(Star s : stars){
 
-            Float64Vector a = s.netForce.times(1/s.mass);
+            Float64Vector a = s.netForce.times(1/(1.988e30*s.mass)); //m/s^2
 
             //v = d/t
             //F = m*a
             //d = 1/2*a*t^2
-            s.velocity = s.velocity.plus(a.times(timeStep));
+            s.velocity = s.velocity.plus(a.times(timeStep)); //m/s
+
             double metersToPC = 3.2408e-17;
 
-            s.posX += (s.velocity.getValue(0)*timeStep*metersToPC);
+            s.posX += (s.velocity.getValue(0)*timeStep*metersToPC);//m -> pc
             s.posY += (s.velocity.getValue(1)*timeStep*metersToPC);
             s.posZ += (s.velocity.getValue(2)*timeStep*metersToPC);
 
-            /*s.posX = 0.5 * a.getValue(0) * timeStep * timeStep;
-            s.posY = 0.5 * a.getValue(1) * timeStep * timeStep;
-            s.posZ = 0.5 * a.getValue(2) * timeStep * timeStep;*/
 
         }
 
@@ -219,10 +237,10 @@ public class SimMain {
         for(int i = 0; i < stars.length; i++){
 
             String w = "iteration=" + currentIteration + ",id=" + i + ",posX=" + stars[i].posX +
-                    ",posY=" + stars[i].posY + ",posZ=" + stars[i].colorCode + ",color=" + stars[i].posZ;
+                    ",posY=" + stars[i].posY + ",posZ=" + stars[i].posZ + ",color=" + stars[i].colorCode;
 
             writer.println(w);
-            System.out.println(w);
+            //System.out.println(w);
             //System.out.println("VELX " + i + ": " + stars[i].velocity.get(0));
             /*writer.println(String.format("iteration=%d,id=%d,posX=%d,posY=%d,posZ=%d,color=%d",
                     currentIteration,i,stars[i].posX,stars[i].posY,stars[i].posZ,stars[i].colorCode));*/
@@ -232,8 +250,7 @@ public class SimMain {
 
     //TODO: Add any other necessary data for the SimReader to begin its iterations
     public void writeFileHeading() throws FileNotFoundException, UnsupportedEncodingException{
-        PrintWriter writer = new PrintWriter("sim_data.txt", "UTF-8");
-        writer.println(String.format("particles=%d",particleNumber));
+        writer.println(String.format("HEAD:particles=%d",particleNumber));
     }
 
 

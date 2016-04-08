@@ -2,13 +2,15 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.image.BufferedImage;
 import java.io.*;
 
 /**
  * Created by samhollenbach on 2/15/16.
  */
-public class SimReader extends JFrame implements KeyListener{
+public class SimReader extends JFrame implements KeyListener, MouseWheelListener {
 
     JFrame frame;
     int windowWidth;
@@ -17,10 +19,15 @@ public class SimReader extends JFrame implements KeyListener{
     boolean paused = false;
     final int fps = 60;
     File f;
-    int particleNumber = 3;
+    int particleNumber;
     BufferedReader br;
     BufferedImage backBuffer;
     boolean loop = true;
+    double scale,scalePow;
+    double scaleMin = 1e-8;
+    double scaleMax = 1e3;
+
+    double scaleBar = 0;
 
 
     public SimReader(File f){
@@ -29,7 +36,7 @@ public class SimReader extends JFrame implements KeyListener{
 
 
     public static void main(String[] args) {
-        SimReader sr = new SimReader(new File("sim_data3.txt"));
+        SimReader sr = new SimReader(new File("sim_data.txt"));
         sr.run();
     }
 
@@ -47,15 +54,19 @@ public class SimReader extends JFrame implements KeyListener{
 
         initializeReader();
 
-        //TODO: Process heading line
-        /*String heading;
-        try {
-            heading = br.readLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }*/
+        scalePow = -1;
+        scale = Math.pow(10,scalePow);
+
+        processHeading();
+
+        startReading();
 
 
+        setVisible(false);
+        System.exit(0);
+    }
+
+    void startReading(){
         while(isRunning)
         {
             long time = System.currentTimeMillis();
@@ -75,9 +86,19 @@ public class SimReader extends JFrame implements KeyListener{
                 }catch(Exception e){}
             }
         }
+    }
 
-        setVisible(false);
-        System.exit(0);
+
+    void processHeading(){
+        String heading = "";
+        try {
+            heading = br.readLine();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        heading = heading.substring(15);
+        System.out.println(heading);
+        particleNumber = Integer.valueOf(heading);
     }
 
     void initialize(){
@@ -91,6 +112,7 @@ public class SimReader extends JFrame implements KeyListener{
         setVisible(true);
 
         addKeyListener(this);
+        addMouseWheelListener(this);
 
         backBuffer = new BufferedImage(windowWidth, windowHeight, BufferedImage.TYPE_INT_RGB);
     }
@@ -103,8 +125,6 @@ public class SimReader extends JFrame implements KeyListener{
     void readIteration(BufferedReader br){
         Graphics g = getGraphics();
         Graphics2D bbg = (Graphics2D)backBuffer.getGraphics();
-
-        //ParticleDrawData[] pdd = new ParticleDrawData[]
 
         bbg.setColor(Color.BLACK);
         bbg.fillRect(0,0,windowWidth,windowHeight);
@@ -130,6 +150,10 @@ public class SimReader extends JFrame implements KeyListener{
             }
 
 
+            if(fileLine.startsWith("HEAD")){
+                continue;
+            }
+
             String[] data = fileLine.split(",");
             Double[] numData = new Double[data.length];
             for(int j = 0; j < data.length; j++){
@@ -143,19 +167,44 @@ public class SimReader extends JFrame implements KeyListener{
 
             bbg.setColor(Color.WHITE);
             bbg.drawString(String.valueOf(numData[0]),30,50);
+            double yrs1 = numData[0];
+            double yrs = (int)((yrs1*SimMain.timeStepYrs)/10000.)/100.;
+            bbg.drawString("("+String.valueOf(yrs)+" Megayrs)",30,65);
 
+            double color1 = numData[5];
+            int color = (int)color1;
+            Color particleColor;
             //Checks what color the particle should be
-            Color particleColor = numData[5] == 1 ? Color.RED : Color.GREEN;
+            switch (color){
+                case 0: particleColor = Color.BLACK;
+                    break;
+                case 1: particleColor = Color.GREEN;
+                    break;
+                case 2: particleColor = Color.ORANGE;
+                    break;
+                default: particleColor = Color.WHITE;
+            }
+
             bbg.setColor(particleColor);
 
 
 
             //TODO: Probably changing to 3D at some point, but for now seen from above on Y axis, viewing X and Z axes
             //Also set at 1 pixel size particle right now, but can adjust for what looks best when closer to finished
-            bbg.fillOval(screenLocation[0],screenLocation[1],10,10);
+            if(color == 0){
+                bbg.fillOval(screenLocation[0],screenLocation[1],10,10);
+                bbg.setColor(Color.WHITE);
+                bbg.drawOval(screenLocation[0],screenLocation[1],10,10);
+            }else{
+                bbg.fillOval(screenLocation[0],screenLocation[1],10,10);
+            }
             //System.out.println("test1");
 
         }
+
+        bbg.setColor(Color.WHITE);
+        bbg.drawLine(200,400,450,400);
+        bbg.drawString((int)(scaleBar)/100000.+"kpc",300,420);
 
 
         g.drawImage(backBuffer, 0, 0, this);
@@ -170,10 +219,12 @@ public class SimReader extends JFrame implements KeyListener{
     public int[] translateCoordinatesToScreen(double x, double y, double z){
         int screenCenterX = windowWidth/2;
         int screenCenterY = windowHeight/2;
-        double scale = 1e-4;
+
         int screenX = screenCenterX + (int)(scale*x);
         int screenY = screenCenterY + (int)(scale*y);
         int[] coords = {screenX,screenY};
+        scaleBar = 25000/scale;
+
         return coords;
 
     }
@@ -189,10 +240,30 @@ public class SimReader extends JFrame implements KeyListener{
         if(e.getKeyCode() == KeyEvent.VK_SPACE){
             paused = !paused;
         }
+        if(e.getKeyCode() == KeyEvent.VK_ENTER){
+            initializeReader();
+        }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
+
+    }
+
+    @Override
+    public void mouseWheelMoved(MouseWheelEvent e) {
+        scalePow -= (double)e.getUnitsToScroll()/60;
+        scale = Math.pow(10,scalePow);
+        if(scale > scaleMax){
+            scale = scaleMax;
+        }
+        if(scale < scaleMin){
+            scale = scaleMin;
+        }
+
+
+
+
 
     }
 }
