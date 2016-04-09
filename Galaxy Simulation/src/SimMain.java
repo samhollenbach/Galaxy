@@ -16,8 +16,8 @@ public class SimMain {
     static final double G = 6.67e-11;
     Star[] stars;
     int starIDCount = 0;
-    static int iterations = 2000;
-    static int particleNumber = 5000;
+    static int iterations = 1000;
+    static int particleNumber = 300;
     static double timeStep = 1e13; //(seconds)
     static double timeStepYrs = timeStep /(60*60*24*364.75);
     int currentIteration = 0;
@@ -25,6 +25,7 @@ public class SimMain {
     Galaxy andromeda;
     Galaxy milkyWay;
     PrintWriter writer;
+    ArrayList<DarkMatterSource> darkMatterSources = new ArrayList<DarkMatterSource>();
 
 
     public static void main(String[] args) {
@@ -68,20 +69,6 @@ public class SimMain {
 
 
 
-//        stars[1] = new Star(1,1e6,
-//                -1e6,-1e6,
-//                0,andromeda);
-//        /*stars[2] = new Star(2,1,
-//                1e6,-1e6,
-//                0,andromeda);*/
-//
-//        Float64Vector tempV1 = Float64Vector.valueOf(-2e13,2e13,0);
-//        Float64Vector tempV2 = Float64Vector.valueOf(2e13,-2e13,0);
-//        //Float64Vector tempV3 = Float64Vector.valueOf(-4e13,3e12,0);
-//        stars[0].setVelocity(tempV1);
-//        stars[1].setVelocity(tempV2);
-//        //stars[2].setVelocity(tempV3);
-
         try {
             writer = new PrintWriter("sim_data.txt");
         } catch (FileNotFoundException e) {
@@ -119,6 +106,8 @@ public class SimMain {
         System.out.println("**STARTING SIM LOOP**");
         long simStartTime = System.currentTimeMillis();
         long updateTime = simStartTime;
+
+
         //Main sim timestep loop
         for(int loopNumber = 0; loopNumber < iter; loopNumber++){
 
@@ -136,13 +125,33 @@ public class SimMain {
                     netForce = netForce.plus(getGravityVector(s,tempStar));
                     //System.out.println("***** " + s.ID + " -- " + getGravityVector(s,tempStar));
                 }
+
+
+                //Apply dark matter force
+
+
+
+                if(tempStar.ID != 0){
+                    for(DarkMatterSource dm : darkMatterSources){
+                        netForce = netForce.plus(getDarkMatterVector(tempStar,dm));
+                        /*System.out.println("DM " + tempStar.ID + ": " + getDarkMatterVector(tempStar,dm).normValue());
+                        System.out.println("NET TEMP " + tempStar.ID + ": " + netForce.normValue());*/
+                    }
+                }
+
                 tempStar.netForce = netForce;
-                //System.out.println("NET FORCE " + s.ID + " is " + s.netForce);
+
+                //System.out.println("NET FORCE " + tempStar.ID + " is " + tempStar.netForce);
             }
+
+            //Do moves
+            calculateMovesFromForce(timeStep);
+
+            //Completion updates
             if(System.currentTimeMillis()-updateTime >= 60000){
                 System.out.println("Update: " + loopNumber + " iterations complete" );
+                updateTime = System.currentTimeMillis();
             }
-            calculateMovesFromForce(timeStep);
             if(loopNumber == iter/4){
                 System.out.println("Loop 25% Complete: " + loopNumber + "/" + iter + " lines processed in " + (System.currentTimeMillis()-simStartTime)/1000. + "s");
             }else if(loopNumber == iter/2){
@@ -160,7 +169,6 @@ public class SimMain {
     /// F = G(m1*m2)/r^2
     public Float64Vector getGravityVector(Star s1, Star s2){
 
-        //TODO: Check this if stuff seems weird, lots of shady math goin on
         double p1X = s1.getXInMeters();
         double p2X = s2.getXInMeters();
         double p1Y = s1.getYInMeters();
@@ -184,15 +192,21 @@ public class SimMain {
         return vg;
     }
 
+    public Float64Vector getDarkMatterVector(Star s, DarkMatterSource dm){
+        Float64Vector f = Float64Vector.valueOf(dm.x-s.posX,dm.y-s.posY,dm.z-s.posZ);
+        double scalar = dm.getForceFromDM(s.posX,s.posY,s.posZ)/f.normValue();
+        f = f.times(scalar);
+
+        return f;
+    }
 
 
-    //TODO: Check if this is actually the right calculation for movement from the force
 
-    //Also consider changing the way its set up to force changing the velocity, and then velocity changing position
     public void calculateMovesFromForce(double timeStep){
         for(Star s : stars){
 
             Float64Vector a = s.netForce.times(1/(1.988e30*s.mass)); //m/s^2
+
 
             //v = d/t
             //F = m*a

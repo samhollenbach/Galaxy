@@ -23,7 +23,8 @@ public class SimReader extends JFrame implements KeyListener, MouseWheelListener
     BufferedReader br;
     BufferedImage backBuffer;
     boolean loop = true;
-    double scale,scalePow;
+    double scale;
+    double scalePow = -2;
     double scaleMin = 1e-8;
     double scaleMax = 1e3;
 
@@ -54,7 +55,6 @@ public class SimReader extends JFrame implements KeyListener, MouseWheelListener
 
         initializeReader();
 
-        scalePow = -1;
         scale = Math.pow(10,scalePow);
 
         processHeading();

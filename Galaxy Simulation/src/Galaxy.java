@@ -13,6 +13,7 @@ public class Galaxy {
     int numStars;
     SimMain sm;
     int colorCode;
+    DarkMatterSource dm;
 
 
 
@@ -37,8 +38,10 @@ public class Galaxy {
     }
 
 
-    //TODO: Set star distribution in galaxy based on measured distribution
     public void setStarDistribution(){
+
+        dm = new DarkMatterSource(centerX,centerY,centerZ);
+        sm.darkMatterSources.add(dm);
 
         for(int i = 0; i < numStars; i++){
             double distanceFromCenter = getStarDistributionRandomNumber(1,(int)width);
@@ -49,8 +52,8 @@ public class Galaxy {
 
             double Y = Math.sqrt(Rsqr/(m*m));
             double X = Math.sqrt(Rsqr - (Y*Y));
-//            X *= 5;
-//            Y *= 5;
+            X *= 5;
+            Y *= 5;
 
             if(randSign < 0.25){
                 Y = -Y;
@@ -132,9 +135,12 @@ public class Galaxy {
 
         double velo = 220000;
 
-        if(r < 1.0){
-            velo *= (r+.1);
+        if(r < 200){
+            velo *= (r+.1)/200;
         }
+
+        //TODO: Check initial velocity direction to assure it is perpendicular
+        //Think about using dot product = 0 and solve for arbitrary x,y, then make sure all facing same way using trick below]m
 
         double theta = Math.atan(y1/x1);
         if(x1 < 0){
