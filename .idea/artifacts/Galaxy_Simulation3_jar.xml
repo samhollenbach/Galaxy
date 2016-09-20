@@ -1,8 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="Galaxy Simulation3:jar">
-    <output-path>$PROJECT_DIR$/out/artifacts/Galaxy_Simulation3_jar</output-path>
-    <root id="archive" name="Galaxy Simulation.jar">
-      <element id="module-output" name="Galaxy Simulation" />
-    </root>
-  </artifact>
-</component>
